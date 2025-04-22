@@ -1,0 +1,17 @@
+{
+  "geometric": {
+    "ordered_avg": 3.33217,
+    "random_avg": 150.5883,
+    "theoretical": 3.3333333333333326
+  },
+  "binomial": {
+    "ordered_avg": 120.55746,
+    "random_avg": 161.74864,
+    "theoretical": 120.59999999999991
+  },
+  "wedge": {
+    "ordered_avg": 100.90332,
+    "random_avg": 154.28807,
+    "theoretical": 100.66666666666654
+  }
+}
