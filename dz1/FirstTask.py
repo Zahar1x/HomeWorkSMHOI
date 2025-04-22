@@ -19,6 +19,7 @@ def generate_large_file(file_path: str, target_size_mb: int = 500):
     records_needed = (target_size_mb * 1024 * 1024) // record_size_bytes
 
     with open(file_path, "w") as f:
+        f.write("id;status;timestamp;value;tags\n")
         record_id = 0
         size = f.tell()
         while size < target_size_mb * 1024 * 1024:
