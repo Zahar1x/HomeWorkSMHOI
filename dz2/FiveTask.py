@@ -1,64 +1,118 @@
 import numpy as np
+from typing import List, Tuple
 
 
 class Condition:
-    def __init__(self, T, P):
-        self.T = T  # Время проверки
-        self.P = P  # Вероятность выполнения
+    """Класс, представляющий условие проверки с временем выполнения и вероятностью успеха."""
+
+    def __init__(self, check_time: float, success_prob: float):
+        """
+        Args:
+            check_time: Время выполнения проверки (T)
+            success_prob: Вероятность успешного выполнения (P)
+        """
+        self.check_time = check_time
+        self.success_prob = success_prob
+
+    @property
+    def time_prob_ratio(self) -> float:
+        """Вычисляет отношение времени к вероятности (T/P) для оптимизации порядка."""
+        return self.check_time / self.success_prob
 
 
-# Функция для вычисления среднего времени выполнения проверок
-def calculate_expected_time(conditions):
-    time = 0.0
-    product = 1.0
-    for cond in conditions:
-        time += product * cond.T  # добавляем время на условие
-        product *= cond.P  # добавляем вклад условия для следующих проверок
-    return time
+def calculate_expected_time(conditions: List[Condition]) -> float:
+    """
+    Вычисляет ожидаемое общее время выполнения последовательности проверок.
+
+    Args:
+        conditions: Список условий проверки
+
+    Returns:
+        Ожидаемое суммарное время выполнения
+    """
+    total_time = 0.0
+    cumulative_prob = 1.0  # Вероятность дойти до текущей проверки
+
+    for condition in conditions:
+        total_time += cumulative_prob * condition.check_time
+        cumulative_prob *= condition.success_prob
+
+    return total_time
 
 
-# Тестирование
-def test(N, num_conditions):
+def generate_random_conditions(num_conditions: int) -> List[Condition]:
+    """
+    Генерирует список случайных условий проверки.
+
+    Args:
+        num_conditions: Количество условий для генерации
+
+    Returns:
+        Список случайных условий
+    """
+    return [
+        Condition(
+            check_time=np.random.uniform(1, 11),
+            success_prob=np.random.uniform(0.05, 0.95)
+        )
+        for _ in range(num_conditions)
+    ]
+
+
+def run_performance_test(
+        num_tests: int,
+        num_conditions: int
+) -> Tuple[float, float, float]:
+    """
+    Проводит сравнение производительности упорядоченного и неупорядоченного выполнения проверок.
+
+    Args:
+        num_tests: Количество тестов для усреднения
+        num_conditions: Количество условий в каждом тесте
+
+    Returns:
+        Кортеж из (среднее время без сортировки, среднее время с сортировкой, коэффициент ускорения)
+    """
     total_unsorted_time = 0.0
     total_sorted_time = 0.0
 
-    for _ in range(N):
-        # Генерация случайных условий
-        conditions = [
-            Condition(T=np.random.uniform(1, 11), P=np.random.uniform(0.05, 0.95))
-            for _ in range(num_conditions)
-        ]
+    for _ in range(num_tests):
+        conditions = generate_random_conditions(num_conditions)
 
-        # Вычисление времени для неупорядоченного порядка
-        unsorted_time = calculate_expected_time(conditions)
-        total_unsorted_time += unsorted_time
+        # Время без сортировки
+        total_unsorted_time += calculate_expected_time(conditions)
 
-        # Сортировка условий по возрастанию отношения T/P
-        conditions.sort(key=lambda x: x.T / x.P)
+        # Время с оптимальной сортировкой по возрастанию T/P
+        sorted_conditions = sorted(conditions, key=lambda x: x.time_prob_ratio)
+        total_sorted_time += calculate_expected_time(sorted_conditions)
 
-        # Вычисление времени для оптимального порядка
-        sorted_time = calculate_expected_time(conditions)
-        total_sorted_time += sorted_time
+    avg_unsorted = total_unsorted_time / num_tests
+    avg_sorted = total_sorted_time / num_tests
+    speedup = avg_unsorted / avg_sorted if avg_unsorted > 0 else 0.0
 
-    avg_unsorted_time = total_unsorted_time / N
-    avg_sorted_time = total_sorted_time / N
-
-    return avg_unsorted_time, avg_sorted_time
+    return avg_unsorted, avg_sorted, speedup
 
 
-# Пример использования с вводом пользователя
-if __name__ == "__main__":
-    N = 1000  # Количество тестов
-    num_conditions = int(input("Введите количество условий: "))  # Ввод от пользователя
-    avg_unsorted_time, avg_sorted_time = test(N, num_conditions)
+def main():
+    """Основная функция для взаимодействия с пользователем."""
+    NUM_TESTS = 1000
 
-    print(f"Среднее время для неупорядоченных условий: {avg_unsorted_time:.4f}")
-    print(f"Среднее время для упорядоченных условий: {avg_sorted_time:.4f}")
+    print("Оптимизация порядка выполнения проверок")
+    num_conditions = int(input("Введите количество условий для тестирования: "))
 
-    # Выводим, во сколько раз быстрее оптимальный порядок
-    if avg_unsorted_time > 0:
-        speedup = avg_unsorted_time / avg_sorted_time
-        print(f"Оптимальный порядок быстрее в {speedup:.2f} раз.")
+    unsorted_time, sorted_time, speedup = run_performance_test(
+        NUM_TESTS, num_conditions
+    )
+
+    print("\nРезультаты тестирования:")
+    print(f"- Среднее время без оптимизации: {unsorted_time:.4f}")
+    print(f"- Среднее время с оптимизацией: {sorted_time:.4f}")
+
+    if speedup > 0:
+        print(f"- Оптимальный порядок быстрее в {speedup:.2f} раз")
     else:
-        print("Среднее время для неупорядоченных условий равно 0, невозможно рассчитать ускорение.")
+        print("- Невозможно рассчитать ускорение (нулевое время без оптимизации)")
 
+
+if __name__ == "__main__":
+    main()

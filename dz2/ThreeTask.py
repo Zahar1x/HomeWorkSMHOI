@@ -1,34 +1,51 @@
 import numpy as np
 
 
-def p3(N):
-    i = np.arange(N, dtype=float)
-    probabilities = 1 / np.power(2, i)
-    return probabilities
+def generate_probabilities(num_elements: int) -> np.ndarray:
+    """Генерирует массив вероятностей по формуле 1/2^(i-1).
+
+    Args:
+        num_elements: Количество элементов в массиве вероятностей.
+
+    Returns:
+        Массив numpy с рассчитанными вероятностями.
+    """
+    indices = np.arange(num_elements, dtype=np.float64)
+    return 1 / np.power(2, indices - 1)
 
 
-def calc_cn(prob):
-    prob = np.array(prob)
-    Pi = prob[:, np.newaxis]  # превращаем в столбец
-    Pj = prob[np.newaxis, :]  # превращаем в строку
+def calculate_expected_comparisons(probabilities: np.ndarray) -> float:
+    """Вычисляет математическое ожидание количества сравнений.
 
-    denominator = Pi + Pj
-    # избегаем деления на ноль
+    Args:
+        probabilities: Массив вероятностей.
+
+    Returns:
+        Ожидаемое количество сравнений (значение Cn).
+    """
+    # Преобразуем в столбцовую и строчную матрицы для векторных операций
+    prob_col = probabilities[:, np.newaxis]
+    prob_row = probabilities[np.newaxis, :]
+
+    # Вычисляем знаменатель, избегая деления на ноль
+    denominator = prob_col + prob_row
     with np.errstate(divide='ignore', invalid='ignore'):
-        terms = np.where(denominator != 0, (Pi * Pj) / denominator, 0.0)
+        terms = np.where(denominator != 0,
+                         (prob_col * prob_row) / denominator,
+                         0.0)
 
-    result = 0.5 + np.sum(terms)
-    return result
+    return 0.5 + np.sum(terms)
 
 
-# Главная функция
-def main():
-    N = 1000
-    probabilities = p3(N)
-    result = calc_cn(probabilities)
+def main() -> None:
+    """Основная функция для демонстрации работы алгоритма."""
+    NUM_ELEMENTS = 1000
 
-    print("Вероятности:", probabilities)
-    print("Результат вычисления:", result)
+    probabilities = generate_probabilities(NUM_ELEMENTS)
+    expected_comparisons = calculate_expected_comparisons(probabilities)
+
+    print("Первые 100 вероятностей:", probabilities[:100])
+    print("Ожидаемое количество сравнений:", expected_comparisons)
 
 
 if __name__ == "__main__":
