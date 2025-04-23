@@ -5,3 +5,4 @@ env
 dz1/*data*
 dz1/large_data.jsonl
 dz1/*.jsom
+venv

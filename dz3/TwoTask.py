@@ -3,161 +3,242 @@ from tkinter import simpledialog, messagebox
 from binary_tree import BinaryTree, TreeNode
 
 
-class BinaryTreeApp:
-    def __init__(self, root):
-        self.root = root
+class BinaryTreeVisualizer:
+    """Класс для визуализации бинарного дерева с использованием Tkinter."""
+
+    def __init__(self, master):
+        """
+        Инициализация приложения.
+
+        Args:
+            master: Главное окно Tkinter
+        """
+        self.master = master
         self.tree = None
         self.canvas = None
+
+        # Конфигурация отрисовки
         self.node_radius = 20
         self.horizontal_spacing = 40
         self.vertical_spacing = 80
-        self._after_id = None
+        self.max_display_depth = 5  # Инициализация отсутствующего атрибута
 
         self._setup_ui()
         self.generate_random_tree()
-        self.root.bind("<Configure>", self._safe_redraw)
 
-    #Настройка интерфейса
+        # Оптимизация перерисовки
+        self._redraw_scheduled = False
+        self.master.bind("<Configure>", self.schedule_redraw)
+
     def _setup_ui(self):
-        self.root.title("Визуализация бинарного дерева")
+        """Настройка пользовательского интерфейса."""
+        self.master.title("Визуализатор бинарного дерева")
+        self.master.geometry("800x600")
 
-        # Панель управления
-        control_frame = tk.Frame(self.root)
-        control_frame.pack(pady=10)
+        self._create_control_panel()
+        self._create_canvas()
 
-        tk.Button(control_frame, text="Случайное дерево", command=self.generate_random_tree).pack(side=tk.LEFT, padx=5)
-        tk.Button(control_frame, text="T: Вставить", command=self.run_insert).pack(side=tk.LEFT, padx=5)
-        tk.Button(control_frame, text="D: Удалить", command=self.run_delete).pack(side=tk.LEFT, padx=5)
-        tk.Button(control_frame, text="Очистить", command=self.clear_tree).pack(side=tk.LEFT, padx=5)
+    def _create_control_panel(self):
+        """Создает панель управления."""
+        control_frame = tk.Frame(self.master)
+        control_frame.pack(pady=10, fill=tk.X)
 
-        # Холст для рисования
-        self.canvas = tk.Canvas(self.root, width=800, height=600, bg='white')
-        self.canvas.pack(fill=tk.BOTH, expand=True)
+        buttons = [
+            ("Случайное дерево", self.generate_random_tree),
+            ("Вставить", self.run_insert),
+            ("Удалить", self.run_delete),
+            ("Очистить", self.clear_tree),
+            ("Поиск", self.run_search)
+        ]
 
-    # Безопасная перерисовка с задержкой
-    def _safe_redraw(self, event=None):
-        if hasattr(self, 'tree') and self.tree:
-            if self._after_id:
-                self.root.after_cancel(self._after_id)
-            self._after_id = self.root.after(100, self._draw_tree)
+        for text, command in buttons:
+            btn = tk.Button(control_frame, text=text, command=command)
+            btn.pack(side=tk.LEFT, padx=5, expand=True)
 
-    # Генерация случайного дерева
+    def _create_canvas(self):
+        """Создает холст для отрисовки дерева."""
+        self.canvas = tk.Canvas(
+            self.master,
+            width=800,
+            height=550,
+            bg='white',
+            highlightthickness=0
+        )
+        self.canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+    def schedule_redraw(self, event=None):
+        """Планирует перерисовку дерева с задержкой."""
+        if not self._redraw_scheduled and self.tree:
+            self._redraw_scheduled = True
+            self.master.after(100, self._execute_redraw)
+
+    def _execute_redraw(self):
+        """Выполняет отложенную перерисовку."""
+        self._redraw_scheduled = False
+        self.draw_tree()
+
     def generate_random_tree(self):
+        """Генерирует случайное дерево и перерисовывает его."""
         self.tree = BinaryTree.generate_random_tree()
-        self._draw_tree()
+        self.draw_tree()
 
-
-    # Очистка холста
     def clear_tree(self):
+        """Очищает дерево и холст."""
         self.tree = None
         self.canvas.delete("all")
 
-    # Выполнение вставки
     def run_insert(self):
-        if not self.tree:
-            self.tree = TreeNode(50)
-
-        value = self._ask_value("Введите значение для вставки")
+        """Запрашивает значение и вставляет его в дерево."""
+        value = self._get_user_input("Введите значение для вставки")
         if value is not None:
-            self.tree = BinaryTree.insert(self.tree, value)
-            self._draw_tree()
+            if not self.tree:
+                self.tree = TreeNode(value)
+            else:
+                self.tree = BinaryTree.insert(self.tree, value)
+            self.draw_tree()
 
-    # Выполнение удаления
     def run_delete(self):
+        """Запрашивает значение и удаляет его из дерева."""
         if not self.tree:
-            messagebox.showwarning("Ошибка", "Дерево пустое!")
+            self._show_warning("Дерево пустое!")
             return
 
-        value = self._ask_value("Введите значение для удаления")
+        value = self._get_user_input("Введите значение для удаления")
         if value is not None:
             if not BinaryTree.search(self.tree, value):
-                messagebox.showwarning("Ошибка", "Значение не найдено!")
+                self._show_warning("Значение не найдено!")
             else:
                 self.tree = BinaryTree.delete(self.tree, value)
-                self._draw_tree()
+                self.draw_tree()
 
-    # Диалог ввода значения
-    def _ask_value(self, title):
+    def run_search(self):
+        """Запрашивает значение и подсвечивает его в дереве."""
+        if not self.tree:
+            self._show_warning("Дерево пустое!")
+            return
+
+        value = self._get_user_input("Введите значение для поиска")
+        if value is not None:
+            if BinaryTree.search(self.tree, value):
+                self.draw_tree(highlight_value=value)
+            else:
+                self._show_warning("Значение не найдено!")
+
+    def _get_user_input(self, title):
+        """Отображает диалог ввода значения."""
         try:
-            return int(simpledialog.askstring(title, "Введите число:"))
+            return int(simpledialog.askstring(title, "Введите целое число:"))
         except (TypeError, ValueError):
             return None
 
-    # Отрисовка дерева с автоматическим масштабированием
-    def _draw_tree(self):
+    def _show_warning(self, message):
+        """Отображает предупреждающее сообщение."""
+        messagebox.showwarning("Внимание", message)
+
+    def draw_tree(self, highlight_value=None):
+        """Отрисовывает дерево на холсте."""
         self.canvas.delete("all")
         if not self.tree:
             return
 
-        # Получаем актуальные размеры холста
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
 
         if canvas_width <= 0 or canvas_height <= 0:
             return
 
-        # Вычисляем глубину дерева
         depth = BinaryTree.get_tree_depth(self.tree)
         if depth <= 0:
             return
 
-        # Автоматический расчет параметров отрисовки
-        max_levels = min(depth, 5)  # Ограничиваем глубину отрисовки
+        # Автоматическая настройка параметров отрисовки
+        max_levels = min(depth, self.max_display_depth)
         self.vertical_spacing = (canvas_height - 100) // (max_levels + 1)
 
-        # Рассчитываем горизонтальные расстояния
-        max_nodes = 2 ** (max_levels - 1)
-        required_width = max_nodes * (self.node_radius * 2 + 20)
-        self.horizontal_spacing = min(60, (canvas_width - 100) // max_nodes)
-
-        # Стартовая позиция (по центру)
+        # Рассчитываем стартовую позицию
         start_x = canvas_width // 2
         start_y = 50 + self.node_radius
 
-        # Рекурсивная отрисовка
-        self._draw_node(self.tree, start_x, start_y,
-                        self.horizontal_spacing * (2 ** (max_levels - 1)),
-                        max_levels, 1)
+        # Рекурсивная отрисовка дерева
+        self._draw_subtree(
+            self.tree,
+            start_x,
+            start_y,
+            self.horizontal_spacing * (2 ** (max_levels - 1)),
+            max_levels,
+            1,
+            highlight_value
+        )
 
-    # Рекурсивная отрисовка узлов
-    def _draw_node(self, node, x, y, spacing, max_depth, current_depth):
+    def _draw_subtree(self, node, x, y, spacing, max_depth, current_depth, highlight_value=None):
+        """Рекурсивно отрисовывает поддерево."""
         if not node or current_depth > max_depth:
             return
 
-        # Получаем размеры холста
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
 
-        # Проверяем видимость узла
-        if (x - self.node_radius < 0 or x + self.node_radius > canvas_width or
-                y - self.node_radius < 0 or y + self.node_radius > canvas_height):
-            return
-
-        # Отрисовываем связи с потомками
+        # Отрисовка связей с потомками
         if node.left and current_depth < max_depth:
             left_x = x - spacing / 2
             left_y = y + self.vertical_spacing
-            if (0 <= left_x <= canvas_width and 0 <= left_y <= canvas_height):
-                self.canvas.create_line(x, y + self.node_radius, left_x, left_y - self.node_radius, fill='black')
-                self._draw_node(node.left, left_x, left_y, spacing / 2, max_depth, current_depth + 1)
+            if self._is_visible(left_x, left_y):
+                self.canvas.create_line(
+                    x, y + self.node_radius,
+                    left_x, left_y - self.node_radius,
+                    fill='gray', width=2
+                )
+                self._draw_subtree(
+                    node.left, left_x, left_y,
+                    spacing / 2, max_depth,
+                    current_depth + 1, highlight_value
+                )
 
         if node.right and current_depth < max_depth:
             right_x = x + spacing / 2
             right_y = y + self.vertical_spacing
-            if (0 <= right_x <= canvas_width and 0 <= right_y <= canvas_height):
-                self.canvas.create_line(x, y + self.node_radius, right_x, right_y - self.node_radius, fill='black')
-                self._draw_node(node.right, right_x, right_y, spacing / 2, max_depth, current_depth + 1)
+            if self._is_visible(right_x, right_y):
+                self.canvas.create_line(
+                    x, y + self.node_radius,
+                    right_x, right_y - self.node_radius,
+                    fill='gray', width=2
+                )
+                self._draw_subtree(
+                    node.right, right_x, right_y,
+                    spacing / 2, max_depth,
+                    current_depth + 1, highlight_value
+                )
 
-        # Отрисовываем узел
+        # Отрисовка узла
+        fill_color = 'lightgreen' if highlight_value == node.value else 'lightblue'
         self.canvas.create_oval(
             x - self.node_radius, y - self.node_radius,
             x + self.node_radius, y + self.node_radius,
-            fill='lightblue', outline='black'
+            fill=fill_color, outline='black', width=2
         )
-        self.canvas.create_text(x, y, text=str(node.value), font=('Arial', 10, 'bold'))
+        self.canvas.create_text(
+            x, y,
+            text=str(node.value),
+            font=('Arial', 10, 'bold'),
+            fill='black'
+        )
+
+    def _is_visible(self, x, y):
+        """Проверяет, находится ли точка в видимой области холста."""
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        return (
+                self.node_radius <= x <= canvas_width - self.node_radius and
+                self.node_radius <= y <= canvas_height - self.node_radius
+        )
+
+
+def main():
+    """Точка входа в приложение."""
+    root = tk.Tk()
+    app = BinaryTreeVisualizer(root)
+    root.mainloop()
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = BinaryTreeApp(root)
-    root.mainloop()
+    main()
